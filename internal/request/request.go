@@ -1,6 +1,9 @@
 package request
 
 import (
+	"os"
+	"fmt"
+	"strconv"
 	"github.com/evok02/httpfromtcp/internal/headers"
 	"bytes"
 	"strings"
@@ -11,6 +14,7 @@ import (
 type Request struct {
 	RequestLine RequestLine
 	Headers headers.Headers
+	Body []byte
 	State parseRequestStatus
 	
 }
@@ -28,17 +32,20 @@ type parseRequestStatus int
 const (
 	reqStateInitialized parseRequestStatus = iota 
 	reqStateParsingHeaders
+	reqStateParsingBody
 	reqStateDone
 )
 
 const buffSize = 8
+var contentLength int
 
 
 var	ERROR_INVALID_FORMAT = errors.New("malformed request-line")
 var ERROR_INVALID_METHOD_FORMATING = errors.New("method should consist of capital errors")
 var ERROR_INVALID_PROTOCOL_VERSION = errors.New("poorly formatted protocol version")
-var ERROR_INVALID_REQUEST_STATE = errors.New("errors unknown state of request")
-
+var ERROR_INVALID_REQUEST_STATE = errors.New("unknown state of request")
+var ERROR_MALFORMED_BODY = errors.New("request with malformed body")
+var ERROR_MALFORMED_CONTENT_LENGTH = errors.New("request with malformed content length") 
 
 
 func RequestFromReader(r io.Reader) (*Request, error) {
@@ -55,7 +62,6 @@ func RequestFromReader(r io.Reader) (*Request, error) {
 		if err != nil {
 			if err == io.EOF {
 				req.State = reqStateDone
-				break
 			}
 			return nil, err
 		}
@@ -88,12 +94,36 @@ func (r *Request) parse(data []byte) (int, error) {
 			return 0, err
 		}
 		if done {
-			r.State = reqStateDone
+			val, err := r.Headers.Get("Content-Length")
+			if err != nil {
+				r.State = reqStateDone
+				return 0, nil
+			}
+			contentLength, err = strconv.Atoi(val)
+			if err != nil {
+				return 0, ERROR_MALFORMED_CONTENT_LENGTH
+			}
+			r.State = reqStateParsingBody 
+			return len(crlf), nil
 		}
-		return numBytes, nil
+		return numBytes , nil
+
+	case reqStateParsingBody:
+		r.Body = append(r.Body, data...)
+		if len(r.Body) > contentLength {
+			return 0, ERROR_MALFORMED_BODY
+		} else if len(r.Body) == contentLength {
+			r.State = reqStateDone
+		} else {
+			if string(data) == string(crlf) {
+				return 0, ERROR_MALFORMED_BODY
+			}
+			return len(data), nil
+		}
 	default:
 		return 0, ERROR_INVALID_REQUEST_STATE
 	}
+	return 0, nil
 }
 
 func parseRequestLine(buf []byte) (int, *RequestLine, error) {

@@ -32,11 +32,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, err
 	}
 
-	if b, _ := h.IsExist(key); b {
-		h[key] += fmt.Sprintf(", %s", value)
-	} else {
-		h[key] = value
-	}
+	h.Set(key, value)
 
 	return idx + len(CRLF), false, nil
 }
@@ -85,6 +81,14 @@ func (h Headers) Get(token string) (string, error) {
 		return "", ERROR_INVALID_HEADER_NAME
 	}
 	return val, nil
+}
+
+func (h Headers) Set(token string, value string) {
+	if b, _ := h.IsExist(strings.ToLower(token)); b {
+		h[token] += fmt.Sprintf(", %s", value)
+	} else {
+		h[token] = value
+	}
 }
 
 func (h Headers) IsExist(token string) (bool, string) {
