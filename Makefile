@@ -2,4 +2,4 @@ test:
 	@go test ./...
 
 run:
-	@go run ./cmd/tcplistener/main.go
+	@go run ./cmd/httpserver/main.go

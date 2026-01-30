@@ -85,9 +85,9 @@ func (h Headers) Get(token string) (string, error) {
 
 func (h Headers) Set(token string, value string) {
 	if b, _ := h.IsExist(strings.ToLower(token)); b {
-		h[token] += fmt.Sprintf(", %s", value)
+		h[strings.ToLower(token)] += fmt.Sprintf(", %s", value)
 	} else {
-		h[token] = value
+		h[strings.ToLower(token)] = value
 	}
 }
 
@@ -97,5 +97,4 @@ func (h Headers) IsExist(token string) (bool, string) {
 	}
 	return false, ""
 }
-
 
