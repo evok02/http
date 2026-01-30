@@ -66,7 +66,6 @@ func RequestFromReader(r io.Reader) (*Request, error) {
 		}
 		copy(buf, buf[numParsedBytes:])
 		readToIdx -= numParsedBytes
-		println(req.State)
 	}
 	return req, nil
 }
