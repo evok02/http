@@ -1,6 +1,7 @@
 package request
 
 import (
+	"github.com/evok02/httpfromtcp/internal/headers"
 	"bytes"
 	"strings"
 	"io"
@@ -9,7 +10,9 @@ import (
 
 type Request struct {
 	RequestLine RequestLine
+	Headers headers.Headers
 	State parseRequestStatus
+	
 }
 
 type RequestLine struct {
@@ -24,6 +27,7 @@ type parseRequestStatus int
 
 const (
 	reqStateInitialized parseRequestStatus = iota 
+	reqStateParsingHeaders
 	reqStateDone
 )
 
@@ -33,6 +37,7 @@ const buffSize = 8
 var	ERROR_INVALID_FORMAT = errors.New("malformed request-line")
 var ERROR_INVALID_METHOD_FORMATING = errors.New("method should consist of capital errors")
 var ERROR_INVALID_PROTOCOL_VERSION = errors.New("poorly formatted protocol version")
+var ERROR_INVALID_REQUEST_STATE = errors.New("errors unknown state of request")
 
 
 
@@ -61,20 +66,35 @@ func RequestFromReader(r io.Reader) (*Request, error) {
 		}
 		copy(buf, buf[numParsedBytes:])
 		readToIdx -= numParsedBytes
+		println(req.State)
 	}
 	return req, nil
 }
 
 func (r *Request) parse(data []byte) (int, error) {
-	numBytes, reqLine, err := parseRequestLine(data)
-	if err != nil {
-		return 0, err
+	switch r.State {
+	case reqStateInitialized:
+		numBytes, reqLine, err := parseRequestLine(data)
+		if err != nil {
+			return 0, err
+		}
+		if numBytes > 0 {
+			r.State = reqStateParsingHeaders
+			r.RequestLine = *reqLine
+		}
+		return numBytes, nil
+	case reqStateParsingHeaders:
+		numBytes, done, err := r.Headers.Parse(data)
+		if err != nil {
+			return 0, err
+		}
+		if done {
+			r.State = reqStateDone
+		}
+		return numBytes, nil
+	default:
+		return 0, ERROR_INVALID_REQUEST_STATE
 	}
-	if numBytes > 0 {
-		r.State = reqStateDone
-		r.RequestLine = *reqLine
-	}
-	return numBytes, nil
 }
 
 func parseRequestLine(buf []byte) (int, *RequestLine, error) {
@@ -125,5 +145,6 @@ func NewRequest() *Request {
 	return &Request{
 		State: reqStateInitialized,
 		RequestLine: RequestLine{},
+		Headers: headers.NewHeaders(),
 	}
 }

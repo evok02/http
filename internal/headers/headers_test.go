@@ -57,7 +57,6 @@ func TestHeaders(t *testing.T) {
 	assert.Equal(t, n, 23)
 	assert.NoError(t, err)
 	val, err := headers.Get("Host")
-	println(val)
 	assert.NoError(t, err)
 	assert.Equal(t, val, "localhost:42069")
 

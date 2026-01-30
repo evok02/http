@@ -31,9 +31,8 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	if err != nil {
 		return 0, false, err
 	}
-	
 
-	if b, storedVal := h.IsExist(key); b && storedVal != "" {
+	if b, _ := h.IsExist(key); b {
 		h[key] += fmt.Sprintf(", %s", value)
 	} else {
 		h[key] = value
@@ -72,7 +71,7 @@ func validateFieldName(token string) error {
 
 func validateTokenChars(token string) error {
 	for _, char := range token {
-		if  char == 34 || char == 40 || char == 41 || char == 44 || char == 47 ||
+		if  char == 32 || char == 34 || char == 40 || char == 41 || char == 44 || char == 47 ||
 			(char > 57 && char < 65) || char > 126 {
 			return ERROR_MALFORMED_HEADER
 		}
@@ -89,7 +88,7 @@ func (h Headers) Get(token string) (string, error) {
 }
 
 func (h Headers) IsExist(token string) (bool, string) {
-	if val, err := h.Get(token); err != nil {
+	if val, err := h.Get(token); err == nil {
 		return true, val
 	}
 	return false, ""
