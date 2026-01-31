@@ -1,9 +1,8 @@
 package request
 
 import (
-	"os"
-	"fmt"
 	"strconv"
+	"fmt"
 	"github.com/evok02/httpfromtcp/internal/headers"
 	"bytes"
 	"strings"
@@ -72,6 +71,7 @@ func RequestFromReader(r io.Reader) (*Request, error) {
 		}
 		copy(buf, buf[numParsedBytes:])
 		readToIdx -= numParsedBytes
+		fmt.Printf("request state: %d\n", req.State)
 	}
 	return req, nil
 }

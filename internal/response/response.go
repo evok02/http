@@ -1,6 +1,7 @@
 package response
 
 import (
+	"log"
 	"strconv"
 	"io"
 	"errors"
@@ -59,6 +60,7 @@ func WriteHeaders(w io.Writer, headers headers.Headers) error {
 		WriteStatusLine(w, 400)
 		return err
 	}
+
 	
 	WriteStatusLine(w, 200)
 	w.Write([]byte("Content-Length: " + contentLength + CRLF))
