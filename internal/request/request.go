@@ -1,7 +1,6 @@
 package request
 
 import (
-	//"fmt"
 	"strconv"
 	"github.com/evok02/httpfromtcp/internal/headers"
 	"bytes"

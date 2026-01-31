@@ -13,7 +13,7 @@ const port = 42069
 
 func HandlerFunction(w io.Writer, r *request.Request) *server.HandlerError {
 	if r.RequestLine.RequestTarget == "/yourproblem" {
-		return server.NewError("Your rpoblem is not my problem\n", 400)
+		return server.NewError("Your problem is not my problem\n", 400)
 	}
 
 	if r.RequestLine.RequestTarget == "/myproblem" {

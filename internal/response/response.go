@@ -1,7 +1,7 @@
 package response
 
 import (
-	//"log"
+	"fmt"
 	"strconv"
 	"io"
 	"errors"
@@ -44,31 +44,14 @@ func GetDefaultHeaders(contentLen int) headers.Headers {
 }
 
 func WriteHeaders(w io.Writer, headers headers.Headers) error {
-	contentLength, ok := headers.Get("Content-Length")
-	if !ok {
-		WriteStatusLine(w, 400)
-		return ERROR_MISSING_DEFAULT_HEADER
+	for k, v := range headers {
+		_, err := w.Write([]byte(fmt.Sprintf("%s: %s\r\n", k, v)))
+		if err != nil {
+			return err
+		}
 	}
-
-	contentType, ok := headers.Get("Content-Type")
-	if !ok {
-		WriteStatusLine(w, 400)
-		return ERROR_MISSING_DEFAULT_HEADER
-	}
-
-	connection, ok := headers.Get("Connection")
-	if !ok {
-		WriteStatusLine(w, 400)
-		return ERROR_MISSING_DEFAULT_HEADER
-	}
-
-
-	
-	WriteStatusLine(w, 200)
-	w.Write([]byte("Content-Length: " + contentLength + CRLF))
-	w.Write([]byte("Content-Type: " + contentType + CRLF))
-	w.Write([]byte("Connection: " + connection + CRLF + CRLF))
-	return nil
+	_, err := w.Write([]byte(CRLF))
+	return err
 }
 
 

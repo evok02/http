@@ -97,7 +97,7 @@ func  WriteError(w io.Writer, e *HandlerError) {
 	response.WriteStatusLine(w, e.StatusCode)
 	headers := response.GetDefaultHeaders(len(e.Msg))
 	response.WriteHeaders(w, headers)
-	w.Write([]byte("\r\n" + e.Msg))
+	w.Write([]byte(e.Msg))
 }
 
 type Handler func(io.Writer, *request.Request) *HandlerError
