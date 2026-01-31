@@ -5,15 +5,17 @@ import (
 	"net"
 	"log"
 	"strconv"
+	"sync/atomic"
 	"github.com/evok02/httpfromtcp/internal/request"
 	"github.com/evok02/httpfromtcp/internal/response"
 	"bytes"
 )
 
 type Server struct {
-	Addr string
-	Connection net.Listener
-	Handler Handler
+	addr string
+	connection net.Listener
+	handler Handler
+	closed atomic.Bool
 }
 
 func Serve(port int, h Handler) (*Server, error){
@@ -26,34 +28,37 @@ func Serve(port int, h Handler) (*Server, error){
 	}
 
 	s := &Server{
-		Addr: addr,
-		Connection: l,
-		Handler: h,
+		addr: addr,
+		connection: l,
+		handler: h,
 	}
 
-	go func() {
-		s.listen()
-	}()
+	go s.listen()
 	return s, nil
 }
 
 func (s *Server) Close() error {
-	return s.Connection.Close()
+	s.closed.Store(true)
+	if s.connection != nil {
+		return s.connection.Close()
+	}
+	return nil
 }
 
 func (s *Server) handle(c net.Conn) {
 	req, err := request.RequestFromReader(c)
 	if err != nil {
 		WriteError(c, NewError(err.Error(), response.StatusBadRequest))
+		return
 	}
 	defer c.Close()
 
 	var buf bytes.Buffer
-	handlerErr := s.Handler(&buf, req)
-	if err != nil {
+	handlerErr := s.handler(&buf, req)
+	if handlerErr != nil {
 		WriteError(c, handlerErr)
+		return
 	}
-
 
 	response.WriteStatusLine(c, response.StatusOK)
 	headers := response.GetDefaultHeaders(buf.Len())
@@ -63,7 +68,7 @@ func (s *Server) handle(c net.Conn) {
 
 func (s *Server) listen() {
 	for {
-		conn, err := s.Connection.Accept()
+		conn, err := s.connection.Accept()
 		if err != nil {
 			log.Printf("Connection(addr: %s) lost: %s", conn.RemoteAddr().String(), err.Error())
 		}

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"strings"
 	"errors"
-	"fmt"
 )
 
 type Headers map[string]string
@@ -24,7 +23,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	case -1:
 		return 0, false, nil
 	case 0:
-		return 0, true, nil
+		return len(CRLF), true, nil
 	}
 
 	key, value, err := parseFieldLine(data[:idx])
@@ -75,26 +74,20 @@ func validateTokenChars(token string) error {
 	return nil
 }
 
-func (h Headers) Get(token string) (string, error) {
+func (h Headers) Get(token string) (string, bool) {
 	val, ok := h[strings.ToLower(token)]
-	if !ok {
-		return "", ERROR_INVALID_HEADER_NAME
-	}
-	return val, nil
+	return val, ok
 }
 
 func (h Headers) Set(token string, value string) {
-	if b, _ := h.IsExist(strings.ToLower(token)); b {
-		h[strings.ToLower(token)] += fmt.Sprintf(", %s", value)
-	} else {
-		h[strings.ToLower(token)] = value
-	}
+	tokenLower := strings.ToLower(token)
+	storedValue, ok := h.Get(token)
+	if ok {
+		newVal := strings.Join([]string{storedValue, value}, ", ")
+		h[tokenLower] = newVal
+		return
+	} 
+	h[tokenLower] = value
 }
 
-func (h Headers) IsExist(token string) (bool, string) {
-	if val, err := h.Get(token); err == nil {
-		return true, val
-	}
-	return false, ""
-}
 

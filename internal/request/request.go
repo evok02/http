@@ -1,8 +1,8 @@
 package request
 
 import (
+	//"fmt"
 	"strconv"
-	"fmt"
 	"github.com/evok02/httpfromtcp/internal/headers"
 	"bytes"
 	"strings"
@@ -15,7 +15,7 @@ type Request struct {
 	Headers headers.Headers
 	Body []byte
 	State parseRequestStatus
-	
+	bodyLengthRead int
 }
 
 type RequestLine struct {
@@ -35,17 +35,16 @@ const (
 	reqStateDone
 )
 
-const buffSize = 8
-var contentLength int
-
+const buffSize = 8 
 
 var	ERROR_INVALID_FORMAT = errors.New("malformed request-line")
 var ERROR_INVALID_METHOD_FORMATING = errors.New("method should consist of capital errors")
+var ERROR_INCORRECT_REQUEST_FORMAT = errors.New("incomplete request")
 var ERROR_INVALID_PROTOCOL_VERSION = errors.New("poorly formatted protocol version")
 var ERROR_INVALID_REQUEST_STATE = errors.New("unknown state of request")
 var ERROR_MALFORMED_BODY = errors.New("request with malformed body")
 var ERROR_MALFORMED_CONTENT_LENGTH = errors.New("request with malformed content length") 
-
+var ERROR_READ_IN_DONE_STATE = errors.New("trying to read data in done state")
 
 func RequestFromReader(r io.Reader) (*Request, error) {
 	buf := make([]byte, buffSize)
@@ -60,7 +59,10 @@ func RequestFromReader(r io.Reader) (*Request, error) {
 		n, err := r.Read(buf[readToIdx:])
 		if err != nil {
 			if err == io.EOF {
-				req.State = reqStateDone
+				if req.State != reqStateDone {
+					return nil, ERROR_INCORRECT_REQUEST_FORMAT
+				}
+				break
 			}
 			return nil, err
 		}
@@ -71,12 +73,26 @@ func RequestFromReader(r io.Reader) (*Request, error) {
 		}
 		copy(buf, buf[numParsedBytes:])
 		readToIdx -= numParsedBytes
-		fmt.Printf("request state: %d\n", req.State)
 	}
 	return req, nil
 }
 
 func (r *Request) parse(data []byte) (int, error) {
+	totalBytesParsed := 0
+	for r.State != reqStateDone {
+		n, err := r.parseSingle(data[totalBytesParsed:])
+		if err != nil {
+			return 0, err
+		}
+		totalBytesParsed += n
+		if n == 0 {
+			break
+		}
+	}
+	return totalBytesParsed, nil
+}
+
+func (r *Request) parseSingle(data []byte) (int, error) {
 	switch r.State {
 	case reqStateInitialized:
 		numBytes, reqLine, err := parseRequestLine(data)
@@ -94,36 +110,36 @@ func (r *Request) parse(data []byte) (int, error) {
 			return 0, err
 		}
 		if done {
-			val, err := r.Headers.Get("Content-Length")
-			if err != nil {
-				r.State = reqStateDone
-				return 0, nil
-			}
-			contentLength, err = strconv.Atoi(val)
-			if err != nil {
-				return 0, ERROR_MALFORMED_CONTENT_LENGTH
-			}
 			r.State = reqStateParsingBody 
-			return len(crlf), nil
 		}
 		return numBytes , nil
 
 	case reqStateParsingBody:
-		r.Body = append(r.Body, data...)
-		if len(r.Body) > contentLength {
-			return 0, ERROR_MALFORMED_BODY
-		} else if len(r.Body) == contentLength {
+		contentLenStr, ok := r.Headers.Get("Content-Length")
+		if !ok {
 			r.State = reqStateDone
-		} else {
-			if string(data) == string(crlf) {
-				return 0, ERROR_MALFORMED_BODY
-			}
 			return len(data), nil
 		}
+		contentLen, err := strconv.Atoi(contentLenStr)
+		if err != nil {
+			return 0, ERROR_MALFORMED_CONTENT_LENGTH
+		}
+		r.Body = append(r.Body, data...)
+		r.bodyLengthRead += len(data)
+		if r.bodyLengthRead > contentLen {
+			return 0, ERROR_MALFORMED_BODY
+		}
+		if r.bodyLengthRead == contentLen {
+			r.State = reqStateDone 
+		}
+		return len(data), nil
+		
+	case reqStateDone:
+		return 0, ERROR_READ_IN_DONE_STATE
+
 	default:
 		return 0, ERROR_INVALID_REQUEST_STATE
 	}
-	return 0, nil
 }
 
 func parseRequestLine(buf []byte) (int, *RequestLine, error) {
@@ -175,5 +191,6 @@ func NewRequest() *Request {
 		State: reqStateInitialized,
 		RequestLine: RequestLine{},
 		Headers: headers.NewHeaders(),
+		Body: make([]byte, 0),
 	}
 }

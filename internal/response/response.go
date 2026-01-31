@@ -1,7 +1,7 @@
 package response
 
 import (
-	"log"
+	//"log"
 	"strconv"
 	"io"
 	"errors"
@@ -19,6 +19,7 @@ const (
 const CRLF = "\r\n"
 
 var ERROR_UNSUPPORTED_STATUS_CODE = errors.New("unsupported status code")
+var ERROR_MISSING_DEFAULT_HEADER = errors.New("error missing default header")
 
 func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
 	switch statusCode {
@@ -43,23 +44,24 @@ func GetDefaultHeaders(contentLen int) headers.Headers {
 }
 
 func WriteHeaders(w io.Writer, headers headers.Headers) error {
-	contentLength, err := headers.Get("Content-Length")
-	if err != nil {
+	contentLength, ok := headers.Get("Content-Length")
+	if !ok {
 		WriteStatusLine(w, 400)
-		return err
+		return ERROR_MISSING_DEFAULT_HEADER
 	}
 
-	contentType, err := headers.Get("Content-Type")
-	if err != nil {
+	contentType, ok := headers.Get("Content-Type")
+	if !ok {
 		WriteStatusLine(w, 400)
-		return err
+		return ERROR_MISSING_DEFAULT_HEADER
 	}
 
-	connection, err := headers.Get("Connection")
-	if err != nil {
+	connection, ok := headers.Get("Connection")
+	if !ok {
 		WriteStatusLine(w, 400)
-		return err
+		return ERROR_MISSING_DEFAULT_HEADER
 	}
+
 
 	
 	WriteStatusLine(w, 200)

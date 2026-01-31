@@ -29,12 +29,19 @@ func TestHeaders(t *testing.T) {
 	data = []byte("\r\n\r\n")
 	n, done, err = headers.Parse(data)
 	require.True(t, done)
-	require.Equal(t, n, 0)
+	require.Equal(t, 2, n)
+	require.NoError(t, err)
+
+	headers = NewHeaders()
+	data = []byte("\r\n")
+	n, done, err = headers.Parse(data)
+	require.True(t, done)
+	require.Equal(t, 2, n)
 	require.NoError(t, err)
 
 	//Test: 2 Headers
 	headers = NewHeaders()
-	data = []byte("Host: localhost:42069\r\nBrowser: Firefox\r\n\r\n")
+	data = []byte("Host: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n")
 	n, done, err = headers.Parse(data)
 	require.False(t, done)
 	require.Equal(t, n, 23)
@@ -56,8 +63,8 @@ func TestHeaders(t *testing.T) {
 	require.False(t, done)
 	assert.Equal(t, n, 23)
 	assert.NoError(t, err)
-	val, err := headers.Get("Host")
-	assert.NoError(t, err)
+	val, ok := headers.Get("Host")
+	assert.True(t, ok)
 	assert.Equal(t, val, "localhost:42069")
 
 	//Test: Case-sensitive GET
@@ -66,8 +73,8 @@ func TestHeaders(t *testing.T) {
 	n, done, err = headers.Parse(data)
 	require.False(t, done)
 	assert.NoError(t, err)
-	val, err = headers.Get("HOST")
-	assert.NoError(t, err)
+	val, ok = headers.Get("HOST")
+	assert.True(t, ok)
 	assert.Equal(t, val, "localhost:42069")
 
 	//Test: Invalid token character
