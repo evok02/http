@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strconv"
+	"fmt"
 	"github.com/evok02/httpfromtcp/internal/server"
 	"github.com/evok02/httpfromtcp/internal/response"
 	"github.com/evok02/httpfromtcp/internal/request"
@@ -11,6 +13,7 @@ import (
 	"strings"
 	"net/http"
 	"io"
+	"crypto/sha256"
 )
 const port = 42069
 const buffSize = 32
@@ -52,7 +55,7 @@ func asyncWrite(w io.Writer, in <- chan []byte) <- chan []byte {
 	}()
 	return stream
 }
-func HandlerFunction(w response.Writer, r *request.Request) {
+func ProxyHandler(w response.Writer, r *request.Request) {
 	if path, found := strings.CutPrefix(r.RequestLine.RequestTarget, "/httpbin"); found {
 		url := "https://httpbin.org" + path
 
@@ -64,33 +67,52 @@ func HandlerFunction(w response.Writer, r *request.Request) {
 		}
 
 		w.Headers.Set("Transfer-Encoding", "chunked")
+		w.Headers.Set("Trailer", "X-Content-SHA256")
+		w.Headers.Set("Trailer", "X-Content-Length")
 		w.WriteHeaders(response.StatusOK)
 
 		for {
-			nReadBytes, err := res.Body.Read(buf)
+			rN, err := res.Body.Read(buf)
 			if err != nil {
 				if err == io.EOF {
-					break
+					break 
 				}
 				server.WriteError(w, server.NewError(err.Error(), response.StatusInternalError))
 			}
 
-			nWriteBytes, err := w.WriteChunkedBody(buf)
+			buf = buf[:rN]
+			wN, err := w.WriteChunkedBody(buf)
 			if err != nil {
 				server.WriteError(w, server.NewError(err.Error(), response.StatusInternalError))
 			}
-			copy(buf, buf[:nReadBytes - nWriteBytes])
+			fmt.Printf("%d\t%d\n", wN, rN)
+			
 		}
 
 		_, err = w.WriteChunkedBodyDone()
 		if err != nil {
 			server.WriteError(w, server.NewError(err.Error(), response.StatusInternalError))
 		}
+		
+		checksum := sha256.Sum256(w.Body)
+		trailerHeaders := map[string]string{
+			"X-Content-Sha256": fmt.Sprintf("%x", checksum),
+			"X-Content-Length": strconv.Itoa(len(w.Body)),
+		}
+
+		err = w.WriteTrailers(trailerHeaders)
+	}
+}
+
+func BinaryHandler(w response.Writer, r *request.Request) {
+	if r.RequestLine.RequestTarget == "/video" {
+		w.Headers.Set("Content-Type", "video/mp4")
+		w.WriteHeaders(response.StatusOK)
 	}
 }
 
 func main() {
-	server, err := server.Serve(port, HandlerFunction)
+	server, err := server.Serve(port, BinaryHandler)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}

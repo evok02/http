@@ -93,12 +93,25 @@ func NewWriter(c net.Conn) *Writer {
 type StatusLine string
 
 func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
+	w.Body = append(w.Body, p...)
 	w.destBuffer.Write([]byte(fmt.Sprintf("%x\r\n", len(p))))
 	w.destBuffer.Write([]byte(fmt.Sprintf("%s\r\n", p)))
-	return 0, nil
+	return len(p), nil
 }
 
 func (w *Writer) WriteChunkedBodyDone() (int, error) {
-	w.destBuffer.Write([]byte("0\r\n\r\n"))
+	w.destBuffer.Write([]byte("0\r\n"))
 	return 0, nil
+}
+
+func (w *Writer) WriteTrailers(h headers.Headers) error {
+	for k, v := range h {
+		headerLine := fmt.Sprintf("%s: %s\r\n", k, v)
+		_, err := w.destBuffer.Write([]byte(headerLine))
+		if err != nil {
+			return err
+		}
+	}
+	_, err := w.destBuffer.Write([]byte(CRLF))
+	return err
 }
