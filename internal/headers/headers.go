@@ -82,7 +82,7 @@ func (h Headers) Get(token string) (string, bool) {
 func (h Headers) Set(token string, value string) {
 	tokenLower := strings.ToLower(token)
 	storedValue, ok := h.Get(token)
-	if ok {
+	if ok && value != storedValue {
 		newVal := strings.Join([]string{storedValue, value}, ", ")
 		h[tokenLower] = newVal
 		return

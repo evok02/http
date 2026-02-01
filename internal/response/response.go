@@ -61,6 +61,7 @@ func (w *Writer) WriteHeaders(status StatusCode) error {
 			return err
 		}
 	}
+	w.destBuffer.Write([]byte(CRLF))
 
 	return nil
 }
@@ -90,3 +91,14 @@ func NewWriter(c net.Conn) *Writer {
 }
 
 type StatusLine string
+
+func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
+	w.destBuffer.Write([]byte(fmt.Sprintf("%x\r\n", len(p))))
+	w.destBuffer.Write([]byte(fmt.Sprintf("%s\r\n", p)))
+	return 0, nil
+}
+
+func (w *Writer) WriteChunkedBodyDone() (int, error) {
+	w.destBuffer.Write([]byte("0\r\n\r\n"))
+	return 0, nil
+}
