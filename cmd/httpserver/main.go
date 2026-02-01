@@ -2,26 +2,65 @@ package main
 
 import (
 	"github.com/evok02/httpfromtcp/internal/server"
+	"github.com/evok02/httpfromtcp/internal/response"
 	"github.com/evok02/httpfromtcp/internal/request"
 	"os/signal"
 	"syscall"
 	"os"
 	"log"
-	"io"
 )
 const port = 42069
 
-func HandlerFunction(w io.Writer, r *request.Request) *server.HandlerError {
+func HandlerFunction(w response.Writer, r *request.Request) {
+	w.Headers.Set("Content-Type", "text/html")
+
 	if r.RequestLine.RequestTarget == "/yourproblem" {
-		return server.NewError("Your problem is not my problem\n", 400)
+
+		body := []byte(`
+		<html>
+		  <head>
+			<title>400 Bad Request</title>
+		  </head>
+		  <body>
+			<h1>Bad Request</h1>
+			<p>Your request honestly kinda sucked.</p>
+		  </body>
+		</html>
+			`)
+		w.WriteHeaders(400)
+		w.WriteBody(body)
+		return
 	}
 
 	if r.RequestLine.RequestTarget == "/myproblem" {
-		return server.NewError("Woopsie, my bad\n", 500)
+		body := []byte(`
+		<html>
+		  <head>
+			<title>500 Bad Request</title>
+		  </head>
+		  <body>
+			<h1>Internal Server Error</h1>
+			<p>Okay, you know what? This one is on me.</p>
+		  </body>
+		</html>
+			`)
+		w.WriteHeaders(500)
+		w.WriteBody(body)
+		return
 	}
-
-	w.Write([]byte("All good, frfr\n"))
-	return nil
+	body := []byte(`
+	<html>
+	  <head>
+		<title>200 OK</title>
+	  </head>
+	  <body>
+		<h1>Success!</h1>
+		<p>Your request was an absolute banger.</p>
+	  </body>
+	</html>
+		`)
+	w.WriteHeaders(200)
+	w.WriteBody(body)
 }
 
 func main() {

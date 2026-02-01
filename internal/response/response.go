@@ -1,9 +1,10 @@
 package response
 
 import (
+	"net"
 	"fmt"
-	"strconv"
 	"io"
+	"strconv"
 	"errors"
 	"github.com/evok02/httpfromtcp/internal/headers"
 )
@@ -21,16 +22,24 @@ const CRLF = "\r\n"
 var ERROR_UNSUPPORTED_STATUS_CODE = errors.New("unsupported status code")
 var ERROR_MISSING_DEFAULT_HEADER = errors.New("error missing default header")
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
+func (w *Writer)WriteStatusLine(statusCode StatusCode) error {
 	switch statusCode {
 	case StatusOK: 
-		w.Write([]byte("HTTP/1.1 200 OK" + CRLF))
+		w.StatusCode = StatusOK
+		w.StatusLine = "HTTP/1.1 200 OK" + CRLF
 	case StatusBadRequest: 
-		w.Write([]byte("HTTP/1.1 400 BadRequest" + CRLF))
+		w.StatusCode = StatusBadRequest
+		w.StatusLine = "HTTP/1.1 400 OK" + CRLF
 	case StatusInternalError: 
-		w.Write([]byte("HTTP/1.1 500 InternalError" + CRLF))
+		w.StatusCode = StatusInternalError
+		w.StatusLine = "HTTP/1.1 500 OK" + CRLF
 	default:
 		return ERROR_UNSUPPORTED_STATUS_CODE
+	}
+
+	_, err := w.destBuffer.Write([]byte(w.StatusLine))
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -43,15 +52,41 @@ func GetDefaultHeaders(contentLen int) headers.Headers {
 	return h
 }
 
-func WriteHeaders(w io.Writer, headers headers.Headers) error {
-	for k, v := range headers {
-		_, err := w.Write([]byte(fmt.Sprintf("%s: %s\r\n", k, v)))
+func (w *Writer) WriteHeaders(status StatusCode) error {
+	w.WriteStatusLine(status)
+	for k, v := range w.Headers {
+		headerLine := fmt.Sprintf("%s: %s\r\n", k, v)
+		_, err := w.destBuffer.Write([]byte(headerLine))
 		if err != nil {
 			return err
 		}
 	}
-	_, err := w.Write([]byte(CRLF))
-	return err
+
+	return nil
 }
 
+func (w *Writer) WriteBody(body []byte) (int, error) {
+	w.Body = append(w.Body, body...)
+	n, err := w.destBuffer.Write(w.Body)
+	return n, err
+}
 
+type Writer struct {
+	StatusCode StatusCode
+	StatusLine StatusLine
+	Headers headers.Headers
+	Body []byte
+	destBuffer io.Writer
+}
+
+func NewWriter(c net.Conn) *Writer {
+	return &Writer{
+		StatusCode: StatusOK,
+		StatusLine: "HTTP/1.1 200 OK",
+		Headers: headers.Headers{},
+		Body: make([]byte, 0),
+		destBuffer: c,
+	}
+}
+
+type StatusLine string

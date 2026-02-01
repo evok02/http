@@ -1,14 +1,12 @@
 package server
 
 import (
-	"io"
 	"net"
 	"log"
 	"strconv"
 	"sync/atomic"
 	"github.com/evok02/httpfromtcp/internal/request"
 	"github.com/evok02/httpfromtcp/internal/response"
-	"bytes"
 )
 
 type Server struct {
@@ -47,23 +45,13 @@ func (s *Server) Close() error {
 
 func (s *Server) handle(c net.Conn) {
 	req, err := request.RequestFromReader(c)
+	responseWriter := response.NewWriter(c)
 	if err != nil {
-		WriteError(c, NewError(err.Error(), response.StatusBadRequest))
-		return
+		WriteError(*responseWriter, NewError(err.Error(), response.StatusInternalError))
 	}
 	defer c.Close()
 
-	var buf bytes.Buffer
-	handlerErr := s.handler(&buf, req)
-	if handlerErr != nil {
-		WriteError(c, handlerErr)
-		return
-	}
-
-	response.WriteStatusLine(c, response.StatusOK)
-	headers := response.GetDefaultHeaders(buf.Len())
-	response.WriteHeaders(c, headers)
-	c.Write(buf.Bytes())
+	s.handler(*responseWriter, req)
 }
 
 func (s *Server) listen() {
@@ -93,14 +81,13 @@ func NewError(msg string, status response.StatusCode) *HandlerError {
 }
 
 
-func  WriteError(w io.Writer, e *HandlerError) {
-	response.WriteStatusLine(w, e.StatusCode)
-	headers := response.GetDefaultHeaders(len(e.Msg))
-	response.WriteHeaders(w, headers)
-	w.Write([]byte(e.Msg))
+func  WriteError(w response.Writer, e *HandlerError) {
+	w.WriteStatusLine(e.StatusCode)
+	w.WriteHeaders(response.StatusInternalError)
+	w.WriteBody([]byte(e.Msg))
 }
 
-type Handler func(io.Writer, *request.Request) *HandlerError
+type Handler func(response.Writer, *request.Request)
 
 
 
