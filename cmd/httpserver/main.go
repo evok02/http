@@ -112,7 +112,7 @@ func BinaryHandler(w response.Writer, r *request.Request) {
 }
 
 func main() {
-	server, err := server.Serve(port, BinaryHandler)
+	server, err := server.Serve(port, ProxyHandler)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
